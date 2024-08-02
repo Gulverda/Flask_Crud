@@ -1,6 +1,7 @@
 from flask import Flask, request, render_template, url_for, redirect, send_file
 from flask_pymongo import PyMongo
 from bson.objectid import ObjectId
+from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
 import io
 
@@ -18,7 +19,11 @@ def add():
     name = request.form.get('name')
     email = request.form.get('email')
     password = request.form.get('password')
-    mongo.db.users.insert_one({'name': name, 'email': email, 'password': password})
+
+    # Hash the password
+    hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+
+    mongo.db.users.insert_one({'name': name, 'email': email, 'password': hashed_password})
     return redirect(url_for('index'))
 
 @app.route('/edit/<id>', methods=['GET', 'POST'])
@@ -28,7 +33,15 @@ def edit_user(id):
         name = request.form.get('name')
         email = request.form.get('email')
         password = request.form.get('password')
-        mongo.db.users.update_one({'_id': ObjectId(id)}, {'$set': {'name': name, 'email': email, 'password': password}})
+        
+        # Hash the password if provided
+        if password:
+            hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+        else:
+            # Keep the existing password if no new password is provided
+            hashed_password = user['password']
+        
+        mongo.db.users.update_one({'_id': ObjectId(id)}, {'$set': {'name': name, 'email': email, 'password': hashed_password}})
         return redirect(url_for('index'))
     return render_template('edit_user.html', user=user)
 
